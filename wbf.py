@@ -2,38 +2,29 @@ import os
 import glob
 from pathlib import Path
 
-def ler_anotacoes_yolo(caminho_pasta):
-
-    anotacoes = {}
-
-    arquivos_txt = glob.glob(os.path.join(caminho_pasta, "*.txt"))
+def ler_anotacao_yolo(caminho_arquivo_txt):
+    nome_arquivo = Path(caminho_arquivo_txt).stem
     
-    for arquivo_txt in arquivos_txt:
-        # tira .txt
-        nome_arquivo = Path(arquivo_txt).stem
-
-        with open(arquivo_txt, 'r', encoding='utf-8') as f:
-            linhas = f.readlines()
+    with open(caminho_arquivo_txt, 'r', encoding='utf-8') as f:
+        linhas = f.readlines()
     
-        anotacoes_arquivo = []
-        
-        for linha in linhas:
-            linha = linha.strip()
-            if linha:  
-                partes = linha.split()
-                if len(partes) >= 5:  
-                    anotacao = {
-                        'id_classe': int(partes[0]),
-                        'x_centro': float(partes[1]),
-                        'y_centro': float(partes[2]),
-                        'largura': float(partes[3]),
-                        'altura': float(partes[4])
-                    }
-                    anotacoes_arquivo.append(anotacao)
-        
-        anotacoes[nome_arquivo] = anotacoes_arquivo
+    anotacoes_arquivo = []
     
-    return anotacoes
+    for linha in linhas:
+        linha = linha.strip()
+        if linha:  
+            partes = linha.split()
+            if len(partes) >= 5:  
+                anotacao = {
+                    'id_classe': int(partes[0]),
+                    'x_centro': float(partes[1]),
+                    'y_centro': float(partes[2]),
+                    'largura': float(partes[3]),
+                    'altura': float(partes[4])
+                }
+                anotacoes_arquivo.append(anotacao)
+    
+    return (nome_arquivo, anotacoes_arquivo)
 
 def calcular_iou(bbox1, bbox2):
     def yolo_para_coordenadas(bbox):
@@ -64,45 +55,75 @@ def calcular_iou(bbox1, bbox2):
     
     return area_intersecao / area_uniao if area_uniao > 0 else 0.0
 
-def processar_redundancia(anotacoes, limiar_iou=0.5):
-    resultado = {}
+def processar_txt_unico(tupla_arquivo, limiar_iou=0.5):
+    nome_arquivo, lista_anotacoes = tupla_arquivo
+    # se não tem anotação retorna vazio
+    if not lista_anotacoes:
+        return [], []
     
-    for nome_arquivo, lista_anotacoes in anotacoes.items():
-        anotacoes_finais = []
-        pesos = []
+    anotacoes_finais = []
+    pesos_wbf = []
+    processadas = set()
+    
+    #itera para cada anotação
+    for i, anotacao_base in enumerate(lista_anotacoes):
+        #se na lista de processadas, pula
+        if i in processadas:
+            continue
+            
+        # cluster para anotações redundantes
+        grupo_redundantes = [anotacao_base]
+        processadas.add(i)
         
-        processadas = set()
-        
-        for i, anotacao1 in enumerate(lista_anotacoes):
-            if i in processadas:
+        # procura por anotações redundantes
+        for j, anotacao_poss in enumerate(lista_anotacoes[i+1:], i+1):
+            # se já processada, pula
+            if j in processadas:
                 continue
-            grupo = [anotacao1]
-            processadas.add(i)
-            
-            for j, anotacao2 in enumerate(lista_anotacoes[i+1:], i+1):
-                if j in processadas:
-                    continue
-                if (anotacao1['id_classe'] == anotacao2['id_classe'] and 
-                    calcular_iou(anotacao1, anotacao2) > limiar_iou):
-                    grupo.append(anotacao2)
-                    processadas.add(j)
-            
-            anotacao_media = {
-                'id_classe': grupo[0]['id_classe'],
-                'x_centro': sum(a['x_centro'] for a in grupo) / len(grupo),
-                'y_centro': sum(a['y_centro'] for a in grupo) / len(grupo),
-                'largura': sum(a['largura'] for a in grupo) / len(grupo),
-                'altura': sum(a['altura'] for a in grupo) / len(grupo)
-            }
-            
-            peso = len(grupo)
-            
-            anotacoes_finais.append(anotacao_media)
-            pesos.append(peso)
+                
+            # verifica classe e iou se iou > que o definido faz append na lista de redundantes
+            if (anotacao_base['id_classe'] == anotacao_poss['id_classe'] and 
+                calcular_iou(anotacao_base, anotacao_poss) > limiar_iou):
+                
+                grupo_redundantes.append(anotacao_poss)
+                processadas.add(j)
         
-        resultado[nome_arquivo] = {
-            'anotacoes': anotacoes_finais,
-            'pesos': pesos
+        # anotação média do grupo de redundantes
+        # para cada atributo calcula a média
+        anotacao_media = {
+            'id_classe': grupo_redundantes[0]['id_classe'],
+            'x_centro': sum(a['x_centro'] for a in grupo_redundantes) / len(grupo_redundantes),
+            'y_centro': sum(a['y_centro'] for a in grupo_redundantes) / len(grupo_redundantes),
+            'largura': sum(a['largura'] for a in grupo_redundantes) / len(grupo_redundantes),
+            'altura': sum(a['altura'] for a in grupo_redundantes) / len(grupo_redundantes)
         }
+        
+        # se só tem um redundante é a anotação base
+        if len(grupo_redundantes) == 1:
+            # não é redundante, peso 1.0
+            peso_wbf = 1.0
+        # se tem mais de um redundante calcula o peso
+        else:
+            ious_com_media = []
+
+            # itera nas anotacoes que formam o grupo de redundantes
+            for anotacao_original in grupo_redundantes:
+
+                # calcula iou entre cada anotação original e a média
+                iou_com_media = calcular_iou(anotacao_original, anotacao_media)
+                # adiciona na lista de medias
+                ious_com_media.append(iou_com_media)
+            
+            # calcula a média dos ious
+            iou_medio = sum(ious_com_media) / len(ious_com_media)
+            
+        anotacoes_finais.append(anotacao_media)
+        pesos_wbf.append(iou_medio)
+
     
-    return resultado
+    return anotacoes_finais, pesos_wbf
+
+
+if __name__ == "__main__":
+    pass
+    
