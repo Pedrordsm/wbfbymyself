@@ -47,32 +47,33 @@ def calcular_iou(bbox1, bbox2):
         return 0.0
     
     area_intersecao = (x2_intersecao - x1_intersecao) * (y2_intersecao - y1_intersecao)
-    
     area_bbox1 = (x2_1 - x1_1) * (y2_1 - y1_1)
     area_bbox2 = (x2_2 - x1_2) * (y2_2 - y1_2)
-    
     area_uniao = area_bbox1 + area_bbox2 - area_intersecao
     
     return area_intersecao / area_uniao if area_uniao > 0 else 0.0
 
 def processar_txt_unico(tupla_arquivo, limiar_iou=0.5):
     nome_arquivo, lista_anotacoes = tupla_arquivo
-    # se não tem anotação retorna vazio
-    if not lista_anotacoes:
-        return [], []
     
-    anotacoes_finais = []
-    pesos_wbf = []
+    # se não tem anotação retorna listas vazias
+    if not lista_anotacoes:
+        return [], [], []
+    
+    boxes = []    
+    scores = []
+    labels = []
     processadas = set()
     
-    #itera para cada anotação
+    # itera para cada anotação
     for i, anotacao_base in enumerate(lista_anotacoes):
-        #se na lista de processadas, pula
+        # se na lista de processadas, pula
         if i in processadas:
             continue
             
         # cluster para anotações redundantes
         grupo_redundantes = [anotacao_base]
+        indices_grupo = [i]
         processadas.add(i)
         
         # procura por anotações redundantes
@@ -81,49 +82,51 @@ def processar_txt_unico(tupla_arquivo, limiar_iou=0.5):
             if j in processadas:
                 continue
                 
-            # verifica classe e iou se iou > que o definido faz append na lista de redundantes
+            # verifica classe e iou - se iou > limiar adiciona ao grupo
             if (anotacao_base['id_classe'] == anotacao_poss['id_classe'] and 
                 calcular_iou(anotacao_base, anotacao_poss) > limiar_iou):
                 
                 grupo_redundantes.append(anotacao_poss)
+                indices_grupo.append(j)
                 processadas.add(j)
         
-        # anotação média do grupo de redundantes
-        # para cada atributo calcula a média
-        anotacao_media = {
-            'id_classe': grupo_redundantes[0]['id_classe'],
-            'x_centro': sum(a['x_centro'] for a in grupo_redundantes) / len(grupo_redundantes),
-            'y_centro': sum(a['y_centro'] for a in grupo_redundantes) / len(grupo_redundantes),
-            'largura': sum(a['largura'] for a in grupo_redundantes) / len(grupo_redundantes),
-            'altura': sum(a['altura'] for a in grupo_redundantes) / len(grupo_redundantes)
-        }
-        
-        # se só tem um redundante é a anotação base
+        # se só tem uma anotação, adiciona com peso 1.0
         if len(grupo_redundantes) == 1:
-            # não é redundante, peso 1.0
-            peso_wbf = 1.0
-        # se tem mais de um redundante calcula o peso
+            anotacao = grupo_redundantes[0]
+            
+            # coordenadas de canto
+            x1 = anotacao['x_centro'] - anotacao['largura'] / 2
+            y1 = anotacao['y_centro'] - anotacao['altura'] / 2
+            x2 = anotacao['x_centro'] + anotacao['largura'] / 2
+            y2 = anotacao['y_centro'] + anotacao['altura'] / 2
+            
+            boxes.append([x1, y1, x2, y2])
+            scores.append(1.0)  
+            labels.append(anotacao['id_classe'])
+            
         else:
-            ious_com_media = []
-
-            # itera nas anotacoes que formam o grupo de redundantes
-            for anotacao_original in grupo_redundantes:
-
-                # calcula iou entre cada anotação original e a média
+            # calcula e guarda anotação média em relação às redundantes
+            anotacao_media = {
+                'id_classe': grupo_redundantes[0]['id_classe'],
+                'x_centro': sum(a['x_centro'] for a in grupo_redundantes) / len(grupo_redundantes),
+                'y_centro': sum(a['y_centro'] for a in grupo_redundantes) / len(grupo_redundantes),
+                'largura': sum(a['largura'] for a in grupo_redundantes) / len(grupo_redundantes),
+                'altura': sum(a['altura'] for a in grupo_redundantes) / len(grupo_redundantes)
+            }
+            
+            # para cada anotação 
+            for x, anotacao_original in enumerate(grupo_redundantes):
+                # calcula IoU desta anotação com a média do grupo
                 iou_com_media = calcular_iou(anotacao_original, anotacao_media)
-                # adiciona na lista de medias
-                ious_com_media.append(iou_com_media)
+                
+                # converte anotação original para formato de coordenadas de canto
+                x1 = anotacao_original['x_centro'] - anotacao_original['largura'] / 2
+                y1 = anotacao_original['y_centro'] - anotacao_original['altura'] / 2
+                x2 = anotacao_original['x_centro'] + anotacao_original['largura'] / 2
+                y2 = anotacao_original['y_centro'] + anotacao_original['altura'] / 2
             
-            # calcula a média dos ious
-            iou_medio = sum(ious_com_media) / len(ious_com_media)
-            
-        anotacoes_finais.append(anotacao_media)
-        pesos_wbf.append(iou_medio)
-
-    
-    return anotacoes_finais, pesos_wbf
-
-
-if __name__ == "__main__":
-    pass
-    
+                boxes.append([x1, y1, x2, y2])
+                scores.append(iou_com_media) 
+                labels.append(anotacao_original['id_classe'])
+                
+    return boxes, scores, labels
