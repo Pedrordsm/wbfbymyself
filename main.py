@@ -22,7 +22,7 @@ def normalizar_coordenadas(boxes):
         boxes_normalizadas.append([x1, y1, x2, y2])
     
     return boxes_normalizadas
-
+'''
 # aplicar WBF
 def aplicar_wbf_final(boxes_list, scores_list, labels_list, iou_thr=0.5, skip_box_thr=0.0001):
     try:
@@ -54,7 +54,7 @@ def aplicar_wbf_final(boxes_list, scores_list, labels_list, iou_thr=0.5, skip_bo
         return [], [], []
     except Exception as e:
         return [], [], []
-
+'''
 def salvar_resultado_yolo(boxes, scores, labels, arquivo_saida):
     try:
         with open(arquivo_saida, 'w') as f:
@@ -65,8 +65,7 @@ def salvar_resultado_yolo(boxes, scores, labels, arquivo_saida):
                 largura = x2 - x1
                 altura = y2 - y1
                 
-                f.write(f"{int(label)} {x_centro:.6f} {y_centro:.6f} {largura:.6f} {altura:.6f}\n")
-        
+                f.write(f"{int(label)} {x_centro:.6f} {y_centro:.6f} {largura:.6f} {altura:.6f} {score:.6f}\n")
         print(f"Resultado salvo em: {arquivo_saida}")
         
     except Exception as e:
@@ -88,17 +87,18 @@ def processar_arquivo_individual(caminho_arquivo, pasta_saida, limiar_iou=0.5, i
             return False
         
         boxes_norm = normalizar_coordenadas(boxes)
-        
+        '''
         boxes_finais, scores_finais, labels_finais = aplicar_wbf_final(
             [boxes_norm], [scores], [labels], iou_thr_wbf, 0.0001
         )
         
+        
         if len(boxes_finais) == 0:
             print(f"{nome_arquivo}: WBF falhou")
             return False
-        
+        '''
         arquivo_saida = os.path.join(pasta_saida, f"{nome_arquivo}.txt")
-        salvar_resultado_yolo(boxes_finais, scores_finais, labels_finais, arquivo_saida)
+        salvar_resultado_yolo(boxes, scores, labels, arquivo_saida)
         return True
         
     except Exception as e:
@@ -106,7 +106,7 @@ def processar_arquivo_individual(caminho_arquivo, pasta_saida, limiar_iou=0.5, i
         return False
 
 def main():
-    caminho_pasta ="C:/Users/pedro/OneDrive/Desktop/labels/train"
+    caminho_pasta ="/home/pedro/Área de trabalho/DICOM_YOLO_TRAINING/data/labels/trainorig"
     pasta_saida = "resultados_wbf" 
     limiar_iou = 0.5              
     iou_thr_wbf = 0.5           

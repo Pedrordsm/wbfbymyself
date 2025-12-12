@@ -50,7 +50,9 @@ def calcular_iou(bbox1, bbox2):
     area_bbox1 = (x2_1 - x1_1) * (y2_1 - y1_1)
     area_bbox2 = (x2_2 - x1_2) * (y2_2 - y1_2)
     area_uniao = area_bbox1 + area_bbox2 - area_intersecao
-    
+
+
+
     return area_intersecao / area_uniao if area_uniao > 0 else 0.0
 
 def processar_txt_unico(tupla_arquivo, limiar_iou=0.5):
@@ -90,6 +92,7 @@ def processar_txt_unico(tupla_arquivo, limiar_iou=0.5):
                 indices_grupo.append(j)
                 processadas.add(j)
         
+        
         # se só tem uma anotação, adiciona com peso 1.0
         if len(grupo_redundantes) == 1:
             anotacao = grupo_redundantes[0]
@@ -113,6 +116,14 @@ def processar_txt_unico(tupla_arquivo, limiar_iou=0.5):
                 'largura': sum(a['largura'] for a in grupo_redundantes) / len(grupo_redundantes),
                 'altura': sum(a['altura'] for a in grupo_redundantes) / len(grupo_redundantes)
             }
+            x1_media = anotacao_media['x_centro'] - anotacao_media['largura'] / 2
+            y1_media = anotacao_media['y_centro'] - anotacao_media['altura'] / 2
+            x2_media = anotacao_media['x_centro'] + anotacao_media['largura'] / 2
+            y2_media = anotacao_media['y_centro'] + anotacao_media['altura'] / 2
+                
+            boxes.append([x1_media, y1_media, x2_media, y2_media])
+            scores.append(1.0)  
+            labels.append(anotacao_media['id_classe'])
             
             # para cada anotação 
             for x, anotacao_original in enumerate(grupo_redundantes):
