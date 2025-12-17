@@ -26,8 +26,6 @@ def plot_yolo_bboxes(img_path, txt_path, class_names=None, show_confidence=True)
         parts = line.strip().split()
     
         class_id = int(parts[0])
-        if class_id != 5:
-            continue
         x_center_norm = float(parts[1])
         y_center_norm = float(parts[2])
         width_norm = float(parts[3])
@@ -58,12 +56,11 @@ def plot_yolo_bboxes(img_path, txt_path, class_names=None, show_confidence=True)
         cv2.rectangle(img, (x1, y1 - 20), (x1 + text_w, y1), color, -1)
         cv2.putText(img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
     
-    cv2.imwrite("resultado_com_media_score.jpg", img)
+    cv2.imwrite("resultado_orig_remove.jpg", img)
 
 if __name__ == "__main__":
-    imagem = "exame_original/0a4fbc9ade84a7abd1680eb8ba031a9d.png" 
-    arquivo_txt = "/home/pedro/Área de trabalho/wbfbymyself/resultados_wbf/0a4fbc9ade84a7abd1680eb8ba031a9d.txt"
-    
+    imagem = "C:/Users/pedro/Downloads/0a4fbc9ade84a7abd1680eb8ba031a9d.png"
+    arquivo_txt = "resultados_removeduplicatas/0a4fbc9ade84a7abd1680eb8ba031a9d.txt"
     nomes_classes = ['Aortic enlargement', 'Atelectasis', 'Cardiomegaly', 'Calcification', 'Clavicle fracture', 'Consolidation', 'Edema', 'Emphysema', 'Enlarged PA', 'ILD', 'Infiltration', 'Lung cavity', 'Lung cyst', 'Lung Opacity', 'Mediastinal shift', 'Nodule/Mass', 'Pulmonary fibrosis', 'Pneumothorax', 'Pleural thickening', 'Pleural effusion', 'Rib fracture', 'Other lesion']
 
     plot_yolo_bboxes(imagem, arquivo_txt, nomes_classes, show_confidence=True)

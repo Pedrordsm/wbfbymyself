@@ -2,7 +2,7 @@ import os
 import glob
 import numpy as np
 from pathlib import Path
-from wbf import ler_anotacao_yolo, processar_txt_unico
+from wbf_exclui_red import ler_anotacao_yolo, processar_txt_unico, calcular_iou
 
 # normalizar de para 0 e 1 as coordenadas
 def normalizar_coordenadas(boxes):
@@ -106,8 +106,8 @@ def processar_arquivo_individual(caminho_arquivo, pasta_saida, limiar_iou=0.5, i
         return False
 
 def main():
-    caminho_pasta ="/home/pedro/Área de trabalho/DICOM_YOLO_TRAINING/data/labels/trainorig"
-    pasta_saida = "resultados_wbf" 
+    caminho_pasta ="C:/Users/pedro/OneDrive/Desktop/labels/train"
+    pasta_saida = "resultados_removeduplicatas" 
     limiar_iou = 0.5              
     iou_thr_wbf = 0.5           
     
@@ -125,7 +125,8 @@ def main():
     for i, arquivo_txt in enumerate(arquivos_txt, 1):
         nome_arquivo = Path(arquivo_txt).stem
         print(f"\n[{i}/{len(arquivos_txt)}] Processando: {nome_arquivo}")
-        
+        if not nome_arquivo.strip() == "0a4fbc9ade84a7abd1680eb8ba031a9d":
+            continue    
         if processar_arquivo_individual(arquivo_txt, pasta_saida, limiar_iou, iou_thr_wbf):
             sucessos += 1
         else:
